@@ -3,11 +3,18 @@ import numpy as np
 import keras
 from keras.models import Model
 from keras.layers import Input, Dense, Dropout, Flatten
-from keras.layers.merge import concatenate
-from keras.layers.convolutional import Conv2D, Conv1D
-from keras.layers.pooling import MaxPooling2D, AveragePooling1D
+#from keras.layers.merge import concatenate
+from keras.layers import concatenate
+#from keras.layers.convolutional import Conv2D, Conv1D
+from keras.layers import Conv2D, Conv1D
+#from keras.layers.pooling import MaxPooling2D, AveragePooling1D
+from keras.layers import MaxPooling2D, AveragePooling1D
 from keras import backend as K
 from sklearn.neighbors import NearestNeighbors
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+
 
 batch_size = 200
 epochs = 10
@@ -43,6 +50,8 @@ for npzFileName in os.listdir(inDir):
         else:
             currCurrX.extend(currX[i,1:])
         currCurrX = np.array(currCurrX)
+        # Remove padding here
+        #currCurrX = remove_padding_2d(currCurrX)
         newCurrX.append(currCurrX.T)
     currX = np.array(newCurrX)
     assert currX.shape == (ni,nc,nr)
@@ -52,7 +61,6 @@ for npzFileName in os.listdir(inDir):
     y.extend(curry)
     #if len(y) == 10000:
     #    break
-
 y = np.array(y)
 numParams=y.shape[1]
 if useLog:
@@ -68,7 +76,7 @@ X=X[:,:,1:]
 imgRows, imgCols = X.shape[1:]
 
 if useInt:
-    X = X.astype('int8') 
+    X = X.astype('int8')
     #this ^^^ is a bug. the intent was to converts to 0/255, but as it it converts to 0/-1
     #see: https://github.com/flag0010/pop_gen_cnn/issues/4
     #leaving as is so the code represents what we actually did. Bugs and all
@@ -78,6 +86,90 @@ else:
 if convDim == "2d":
     X = X.reshape(X.shape[0], imgRows, imgCols, 1).astype('float32')
 posX = posX.astype('float32')/127.5-1
+
+def find_non_padding_region(slice_2d, padding_value=0):
+    # Find indices of rows and columns that are not entirely padding
+    row_indices = np.where(np.any(slice_2d != padding_value, axis=1))[0]
+    col_indices = np.where(np.any(slice_2d != padding_value, axis=0))[0]
+    
+    return row_indices, col_indices
+
+# Function to shuffle non-zero columns in all 2D slices of a 3D array
+def shuffle_non_zero_columns_3d(array_3d, padding_value=0):
+    # Iterate over each 2D slice
+    for slice_2d in array_3d:
+        rows, cols = find_non_padding_region(slice_2d, 0)
+        row = rows[-1] + 1
+        col = cols[-1] + 1
+        non_zero_data = slice_2d[:row, :col]
+
+        np.random.shuffle(non_zero_data)  # Using np.random.shuffle for in-place shuffling
+        slice_2d[:row, :col] = non_zero_data
+
+    return array_3d
+
+# Function to shuffle non-zero rows in all 2D slices of a 3D array
+def shuffle_non_zero_rows_3d(array_3d, padding_value=0):
+    # Iterate over each 2D slice
+    for slice_2d in array_3d:
+        rows, cols = find_non_padding_region(slice_2d, 0)
+        row = rows[-1] + 1
+        col = cols[-1] + 1
+        non_zero_data = slice_2d[:row, :col].T
+
+        np.random.shuffle(non_zero_data)  # Using np.random.shuffle for in-place shuffling
+        slice_2d[:row, :col] = non_zero_data.T
+
+    return array_3d
+
+X = shuffle_non_zero_columns_3d(X)
+X = shuffle_non_zero_rows_3d(X)
+
+def shuffle_elements_optimized(array_3d, padding_value=0):
+    # Iterate over each 2D slice
+    for slice_2d in array_3d:
+        rows, cols = find_non_padding_region(slice_2d, 0)
+        row = rows[-1] + 1
+        col = cols[-1] + 1
+        non_zero_data = np.zeros(row,col)
+        # Extract non-zero columns
+        non_zero_data = slice_2d[:row, :col]
+
+        # Flatten the non-zero data and shuffle
+        flattened_data = non_zero_data.flatten()
+        np.random.shuffle(flattened_data)  # Using np.random.shuffle for in-place shuffling
+
+        # Reshape and assign back
+        shuffled_data = np.zeros((row, col))
+        shuffled_data[:] = flattened_data.reshape(row, col)
+        slice_2d[:row, :col] = shuffled_data
+
+    return array_3d
+
+#X = shuffle_elements_optimized(X)
+
+max_row_indices = 0
+index = 0
+matrix_ind = 0
+for slice_2d in X:
+    row_indices, _ = find_non_padding_region(slice_2d)
+    #print(row_indices[-1])
+    if row_indices[-1] > max_row_indices:
+        max_row_indices = row_indices[-1]
+        matrix_ind = index
+    index += 1
+
+slice = X[matrix_ind,:,:]
+print("index: ", matrix_ind)
+
+plt.figure(figsize=(36, 3))
+plt.pcolor(slice.T, cmap='viridis')  # Using 'viridis' as the colormap, but you can choose another
+plt.colorbar()  # To show the color scale
+#plt.title('Original')
+#plt.title('Column Shuffled Matrix')
+plt.title('Shuffle Columns First Then Rows')
+#plt.title('Element Shuffled Matrix')
+plt.show()
 
 assert totInstances > testSize+valSize
 
