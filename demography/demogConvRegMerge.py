@@ -240,7 +240,9 @@ plt.title('Original')
 plt.show()
 
 assert totInstances > testSize+valSize
+
 '''
+# Original CNN Code
 testy=y[:testSize]
 valy=y[testSize:testSize+valSize]
 y=y[testSize+valSize:]
