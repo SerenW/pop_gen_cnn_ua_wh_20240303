@@ -27,6 +27,7 @@ for line in content:
     x_values.append(float(x))
     y_values.append(float(y))
 
+print(len(x_values))
 res = stats.spearmanr(x_values, y_values)
 print('Correlation: ' + str(res.correlation))
 print('p-value: ' + str(res.pvalue))
@@ -49,7 +50,7 @@ plt.plot(x_values, fit_y_values, color='red', label='Fit Line')  # Plotting the 
 text_x = min(x_values) - 0.3
 text_y = fit_function(text_x) + 0.5
 plt.text(text_x, text_y, 'y = {:.2f}x {} {:.2f}'.format(coefficients[0], '-' if coefficients[1] < 0 else '+', abs(coefficients[1])), fontsize=12, color='black', verticalalignment='bottom')
-
+plt.autoscale()
 # Adding Spearman correlation and p-value
 #stats_text = 'Spearman Correlation: {:.2f}\nP-value: {:.2e}'.format(res.correlation, res.pvalue)
 #plt.text(max(x_values)-3.5, max(fit_y_values)-1, stats_text, fontsize=12, verticalalignment='bottom')
